@@ -16,8 +16,8 @@ def list_tickets(*, owner=None, status=None, page=1, page_size=2):
         return (owner is None or ticket["owner"] == owner) and (status is None or ticket["status"] == status)
     ordered = sorted(TICKETS, key=lambda ticket: ticket["id"])
     start = (page - 1) * page_size
-    rows = [ticket for ticket in ordered[start:start + page_size] if matches(ticket)]
-    return {"items": rows, "total": sum(matches(ticket) for ticket in ordered), "page": page, "page_size": page_size}
+    rows = [ticket for ticket in ordered if matches(ticket)]
+    return {"items": rows[start:start + page_size], "total": len(rows), "page": page, "page_size": page_size}
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
