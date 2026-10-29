@@ -45,6 +45,14 @@ class ApiTests(HttpCase):
     def test_repeat_is_stable(self):
         self.assertEqual(self.get("?owner=ada&page_size=100"), self.get("?owner=ada&page_size=100"))
 
+    def test_repeated_filters_are_rejected(self):
+        for query in ("?owner=ada&owner=bob", "?status=open&status=closed"):
+            with self.subTest(query=query):
+                with self.assertRaises(HTTPError) as raised:
+                    self.get(query)
+                self.assertEqual(raised.exception.code, 400)
+                self.assertEqual(json.load(raised.exception)["error"], "unknown or repeated parameter")
+
     def test_direct_invalid_types(self):
         for value in (True, None, 1.5):
             with self.subTest(value=value), self.assertRaises(ValueError):
