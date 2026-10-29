@@ -1,0 +1,48 @@
+name: Simulated ticket API
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  api:
+    name: Ticket API tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # One-time full-stop bootstrap: main initially contains only a README.
+    # After this preparation is accepted, every business PR loads CI from base.
+    env:
+      FDE_CI_SOURCE_SHA: ${{ github.event.pull_request.base.sha == 'a709917d6d0f8f87718215957a6aa1f46e1ec1a5' && github.event.pull_request.head.ref == 'fde/ci-preparation' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.sha || github.event.pull_request.base.sha }}
+      FDE_CI_SOURCE_KIND: ${{ github.event.pull_request.base.sha == 'a709917d6d0f8f87718215957a6aa1f46e1ec1a5' && github.event.pull_request.head.ref == 'fde/ci-preparation' && github.event.pull_request.head.repo.full_name == github.repository && 'BOOTSTRAP_FULL_STOP_NOT_BUSINESS_ACCEPTANCE' || 'APPROVED_BASE' }}
+    steps:
+      - name: Checkout approved CI
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.FDE_CI_SOURCE_SHA }}
+          path: approved-ci
+          persist-credentials: false
+      - name: Verify CI source
+        run: |
+          test "$(git -C approved-ci rev-parse HEAD)" = "$FDE_CI_SOURCE_SHA"
+          printf 'CI_SOURCE %s %s\n' "$FDE_CI_SOURCE_KIND" "$FDE_CI_SOURCE_SHA"
+      - name: Checkout candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: candidate
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.14'
+      - name: Pull pinned Python runtime
+        run: docker pull docker.io/library/python@sha256:7bec7ddcddeff7975d6ba9b4be7dd6f6b2f55e7491539145e2978f7f97ce9144
+      - name: Run API checks
+        env:
+          FDE_EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 -I -B approved-ci/ci/report.py checks candidate "$RUNNER_TEMP/ticket-result.json"
+      - name: Report API checks
+        if: always()
+        env:
+          FDE_EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 -I -B approved-ci/ci/report.py report candidate "$RUNNER_TEMP/ticket-result.json"
